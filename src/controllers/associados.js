@@ -96,10 +96,11 @@ const updateassociado = async (req, res) => {
 };
 
 const listassociados = async (req, res) => {
+ const idUser = req.user.id
   try {
-    const associadosListados = await knex('associados').returning('*')
-    const associadosEmDia = await knex('associados').where('status_associado', 'EM DIA').returning('*')
-    const associadosInadimplentes = await knex('associados').where('status_associado', 'INADIMPLENTE').returning('*')
+    const associadosListados = await knex('associados').where('usuario_id', idUser).returning('*')
+    const associadosEmDia = await knex('associados').where('status_associado', 'EM DIA').where('usuario_id', idUser).returning('*')
+    const associadosInadimplentes = await knex('associados').where('status_associado', 'INADIMPLENTE').where('usuario_id', idUser).returning('*')
 
 
     if(associadosListados.length === 0) {

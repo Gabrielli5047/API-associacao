@@ -1,5 +1,5 @@
 const express = require('express');
-const { userRegister, userDetail, userUpdate } = require('./controllers/users');
+const { userRegister, userDetail, userUpdate} = require('./controllers/users');
 const tokenVerify = require('./auth/tokenVerify');
 const { login } = require('./controllers/login');
 const { 
@@ -15,7 +15,9 @@ const {
     listarCobrancasPorAssociado,
     detalharCobranca,
     excluirCobranca,
-    listarCobrancasPorStatus } = require('./controllers/cobrancas');
+    listarCobrancasPorStatus,
+    listarCobrancasPorUser
+} = require('./controllers/cobrancas');
 
 
 const routes = express();
@@ -40,6 +42,7 @@ routes.post('/cobranca', cadastrarCobranca);
 routes.put('/cobrancas/:id', editarCobrancas)
 routes.delete('/cobranca/:id', excluirCobranca)
 routes.get('/cobrancas', listarCobrancas);
+routes.get('/cobrancasUser', listarCobrancasPorUser);
 routes.get('/cobrancas-iniciais', listarCobrancasPorStatus);
 routes.get('/cobrancas/:id', listarCobrancasPorAssociado)
 routes.get('/detalharcobranca/:id', detalharCobranca)

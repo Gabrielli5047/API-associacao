@@ -20,10 +20,12 @@ create table usuarios (
 
  create table cobrancas (
 	id serial primary key,
+  	usuario_id integer not null,
   	associado_id integer not null,
   	data_vencimento date not null,
   	valor int not null,
   	status_cobranca text not null ,
+    foreign key (usuario_id) references usuarios(id),
     foreign key (associado_id) references associados(id)
 );
 

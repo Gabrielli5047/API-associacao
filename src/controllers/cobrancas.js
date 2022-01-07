@@ -22,6 +22,7 @@ async function cadastrarCobranca(req, res) {
 
     const { rowCount } = await knex("cobrancas").insert({
       associado_id,
+      usuario_id: req.user.id,
       data_vencimento,
       valor,
       status_cobranca: statusCobrancaReal,
@@ -41,14 +42,41 @@ async function cadastrarCobranca(req, res) {
 };
 
 async function listarCobrancas(req, res) {
-  
-  try {
-    const cobrancas = await knex('cobrancas').join('associados', 'cobrancas.associado_id', '=', 'associados.id').select('associados.nome', 'cobrancas.*');
-    const cobrancasVencidas = await knex('cobrancas').join('associados', 'cobrancas.associado_id', '=', 'associados.id').where('cobrancas.status_cobranca', 'Vencida').select('associados.nome', 'cobrancas.*');
-    const cobrancasPendentes = await knex('cobrancas').join('associados', 'cobrancas.associado_id', '=', 'associados.id').where('cobrancas.status_cobranca', 'Pendente').select('associados.nome', 'cobrancas.*');
-    const cobrancasPagas = await knex('cobrancas').join('associados', 'cobrancas.associado_id', '=', 'associados.id').where('cobrancas.status_cobranca', 'Paga').select('associados.nome', 'cobrancas.*');
+const idUser = req.user.id
 
-    return res.status(200).json({ status: 200, cobrancas, cobrancasVencidas, cobrancasPendentes, cobrancasPagas });
+  try {
+    const cobrancas = await knex('cobrancas').where('usuario_id', idUser)
+
+    const cobrancasVencidas = await knex('cobrancas')
+    .join('associados', 'cobrancas.associado_id', '=', 'associados.id')
+    .where('cobrancas.status_cobranca', 'Vencida')
+    .select('associados.nome', 'cobrancas.*');
+    const vencidadasUser = cobrancasVencidas.filter((user)=> user.usuario_id === idUser)
+
+    const cobrancasPendentes = await knex('cobrancas').
+    join('associados', 'cobrancas.associado_id', '=', 'associados.id')
+    .where('cobrancas.status_cobranca', 'Pendente')
+    .select('associados.nome', 'cobrancas.*');
+    const pendenteUser = cobrancasPendentes.filter((user)=> user.usuario_id === idUser)
+
+    const cobrancasPagas = await knex('cobrancas')
+    .join('associados', 'cobrancas.associado_id', '=', 'associados.id')
+    .where('cobrancas.status_cobranca', 'Paga')
+    .select('associados.nome', 'cobrancas.*');
+    const pagasUser = cobrancasPagas.filter((user)=> user.usuario_id === idUser)
+
+    return res.status(200).json({ status: 200, cobrancas, vencidadasUser, pendenteUser, pagasUser });
+
+  } catch (error) {
+    return res.status(400).json({ message: error.message });
+  }
+}
+async function listarCobrancasPorUser(req, res) {
+const idUser = req.user.id
+  try {
+    const cobrancas = await knex('cobrancas').where('usuario_id', idUser)
+
+    return res.status(200).json({ status: 200, cobrancas});
 
   } catch (error) {
     return res.status(400).json({ message: error.message });
@@ -56,7 +84,7 @@ async function listarCobrancas(req, res) {
 }
 
 async function editarCobrancas(req, res) {
-  const { data_vencimento, valor, status_cobranca, associado_id } = req.body;
+  const { data_vencimento, valor, status_cobranca, associado_id, usuario_id } = req.body;
   const { id } = req.params;
 
   try {
@@ -81,6 +109,7 @@ async function editarCobrancas(req, res) {
 
     const { rowCount } = await knex('cobrancas').update({
       associado_id,
+      usuario_id,
       data_vencimento,
       valor,
       status_cobranca: statusCobrancaReal
@@ -89,7 +118,6 @@ async function editarCobrancas(req, res) {
     if (rowCount === 0) {
       return res.status(500).json({ status: 500, message: 'Erro ao atualizar cobrança!' })
     }
-
     await verificarSituacaoCliente(associado_id);
 
     return res.status(201).json({ status: 201, message: 'Cobrança atualizada com sucesso!' })
@@ -101,11 +129,12 @@ async function editarCobrancas(req, res) {
 
 async function listarCobrancasPorAssociado(req, res) {
   const { id } = req.params;
+  const idUser = req.user.id
 
   try {
     const cobrancas = await knex('cobrancas').join('associados', 'cobrancas.associado_id', '=', 'associados.id').where('associados.id', id).select('associados.nome', 'cobrancas.*');
-
-    return res.status(200).json({ status: 200, cobrancas });
+    const cobrancasUser = cobrancas.filter((user)=> user.usuario_id === idUser)
+    return res.status(200).json({ status: 200, cobrancasUser });
 
   } catch (error) {
     return res.status(400).json({ message: error.message });
@@ -114,7 +143,7 @@ async function listarCobrancasPorAssociado(req, res) {
 
 async function detalharCobranca(req, res) {
   const { id } = req.params;
-
+  
   try {
     const cobrancas = await knex('cobrancas')
     .join('associados', 'cobrancas.associado_id', '=', 'associados.id')
@@ -171,30 +200,35 @@ const excluirCobranca = async (req, res) => {
 }
 
 async function listarCobrancasPorStatus(req, res) {
+  const idUser = req.user.id
 
   try {
-    const valorCobrancasPagas = await knex('cobrancas').where('status_cobranca', 'Paga').sum('valor');
-    const valorCobrancasVencidas = await knex('cobrancas').where('status_cobranca', 'Vencida').sum('valor');
-    const valorCobrancasPendentes = await knex('cobrancas').where('status_cobranca', 'Pendente').sum('valor');
+    const valorCobrancasPagas = await knex('cobrancas').where('status_cobranca', 'Paga').where('usuario_id', idUser).sum('valor');
+    const valorCobrancasVencidas = await knex('cobrancas').where('status_cobranca', 'Vencida').where('usuario_id', idUser).sum('valor');
+    const valorCobrancasPendentes = await knex('cobrancas').where('status_cobranca', 'Pendente').where('usuario_id', idUser).sum('valor');
 
-    const cobrancasPagas = await knex('cobrancas').join('associados', 'cobrancas.associado_id', '=', 'associados.id').where('cobrancas.status_cobranca', 'Paga').select('associados.nome', 'cobrancas.*').limit(4);
-    const cobrancasVencidas = await knex('cobrancas').join('associados', 'cobrancas.associado_id', '=', 'associados.id').where('cobrancas.status_cobranca', 'Vencida').select('associados.nome', 'cobrancas.*').limit(4);
+    const cobrancasPagas = await knex('cobrancas').join('associados', 'cobrancas.associado_id', '=', 'associados.id').where('cobrancas.status_cobranca', 'Paga').select('associados.nome', 'cobrancas.*').limit(5);
+    const cobrancasVencidas = await knex('cobrancas').join('associados', 'cobrancas.associado_id', '=', 'associados.id').where('cobrancas.status_cobranca', 'Vencida').select('associados.nome', 'cobrancas.*').limit(5);
+    const cobrancasPendentes = await knex('cobrancas').join('associados', 'cobrancas.associado_id', '=', 'associados.id').where('cobrancas.status_cobranca', 'Pendente').select('associados.nome', 'cobrancas.*').limit(5);
 
-    const cobrancasPendentes = await knex('cobrancas').join('associados', 'cobrancas.associado_id', '=', 'associados.id').where('cobrancas.status_cobranca', 'Pendente').select('associados.nome', 'cobrancas.*').limit(4);
+    const cobPagasUser = cobrancasPagas.filter((user)=> user.usuario_id === idUser)
+    const cobVencidasUser = cobrancasVencidas.filter((user)=> user.usuario_id === idUser)
+    const cobPendentesUser = cobrancasPendentes.filter((user)=> user.usuario_id === idUser)
 
-    const qntdCobrancasPagas = await knex('cobrancas').where('status_cobranca', 'Paga').count().first();
-    const qntdCobrancasVencidas = await knex('cobrancas').where('status_cobranca', 'Vencida').count().first();
-    const qntdCobrancasPendentes = await knex('cobrancas').where('status_cobranca', 'Pendente').count().first();
+    const qntdCobrancasPagas = await knex('cobrancas').where('status_cobranca', 'Paga').where('usuario_id', idUser).count().first();
+    const qntdCobrancasVencidas = await knex('cobrancas').where('status_cobranca', 'Vencida').where('usuario_id', idUser).count().first();
+    const qntdCobrancasPendentes = await knex('cobrancas').where('status_cobranca', 'Pendente').where('usuario_id', idUser).count().first();
 
-    const associadosInadimplentes = await knex('associados').where('status_associado', 'INADIMPLENTE').limit(4);
+    const associadosInadimplentes = await knex('associados').where('status_associado', 'INADIMPLENTE').where('usuario_id', idUser).limit(4);
 
-    const associadosEmDia = await knex('associados').where('status_associado', 'EM DIA').limit(4);
+    const associadosEmDia = await knex('associados').where('status_associado', 'EM DIA').where('usuario_id', idUser).limit(4);
 
-    const qntdassociadosEmDia = await knex('associados').where('status_associado', 'EM DIA').count();
+    const qntdassociadosEmDia = await knex('associados').where('status_associado', 'EM DIA').where('usuario_id', idUser).count();
 
-    const qntdassociadosInadimplentes = await knex('associados').where('status_associado', 'INADIMPLENTE').count();
+    const qntdassociadosInadimplentes = await knex('associados').where('status_associado', 'INADIMPLENTE').where('usuario_id', idUser).count();
 
-    return res.status(200).json({ status: 200, qntdCobrancasPagas, qntdCobrancasVencidas, qntdCobrancasPendentes, valorCobrancasPagas, valorCobrancasVencidas, valorCobrancasPendentes, cobrancasPagas, cobrancasVencidas, cobrancasPendentes, associadosInadimplentes, associadosEmDia, qntdassociadosEmDia, qntdassociadosInadimplentes });
+    return res.status(200)
+    .json({ status: 200, qntdCobrancasPagas, qntdCobrancasVencidas, qntdCobrancasPendentes, valorCobrancasPagas, valorCobrancasVencidas, valorCobrancasPendentes, cobPagasUser, cobVencidasUser, cobPendentesUser, associadosInadimplentes, associadosEmDia, qntdassociadosEmDia, qntdassociadosInadimplentes });
 
   } catch (error) {
     return res.status(400).json({ message: error.message });
@@ -210,5 +244,6 @@ module.exports = {
   listarCobrancasPorAssociado,
   detalharCobranca,
   excluirCobranca,
-  listarCobrancasPorStatus
+  listarCobrancasPorStatus,
+  listarCobrancasPorUser
 };
